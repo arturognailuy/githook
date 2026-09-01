@@ -1,4 +1,0 @@
-# Github Webhook Key, use this file with Docker's `--env-file` parameter
-GITHUB_TOKEN=your_webhook_key
-GITHOOK_USER=yourusername
-

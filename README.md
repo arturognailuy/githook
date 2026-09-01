@@ -1,61 +1,18 @@
-githook
-=======
+# Githook
 
-Github Hook Service for [gnailuy.com](http://gnailuy.com/).
+Githook is a Go service that receives signed GitHub `workflow_run` notifications and deploys verified immutable `gnailuy.com` artifacts on the same host.
 
-### Prepare the site directory
+One binary exposes separate trust domains:
 
-``` bash
-WORKDIR=/home/yourusername/
+- `githook serve` validates raw-body HMAC-SHA256 signatures and writes a durable SQLite queue.
+- `githook worker` re-reads authoritative run metadata and artifacts from GitHub before atomic activation.
+- `githook reconcile` discovers the newest eligible successful run and processes it through the same path.
+- `githook deploy-run --sha <sha> <run-id>` replays one run through the same validation path.
 
-mkdir -p $WORKDIR/webroot
-mkdir -p $WORKDIR/redis_data
-mkdir -p $WORKDIR/logs
+Start with [`AGENT.md`](AGENT.md), then use [`.aidoc/INDEX.md`](.aidoc/INDEX.md) for architecture and operating context.
 
-git clone https://github.com/gnailuy/gnailuy.com.git
-cd $WORKDIR/gnailuy.com
-git submodule init
-git submodule update
+## Development
 
-# Copy `environment.rc` to $WORKDIR and edit it according to your configuration
-```
+Requires Go 1.25 or newer. Run `go test ./...`, `go vet ./...`, and `go build ./cmd/githook` before review.
 
-### Build the image
-
-``` bash
-# Build `gnailuy/jekyll` first. See: http://github.com/gnailuy/gnailuy.com/
-
-# In the `server` directory
-docker build -t gnailuy/githook_server .
-
-# In the `worker` directory
-docker build -t gnailuy/githook_worker .
-```
-
-### Run on Docker
-
-``` bash
-WORKDIR=/home/yourusername/
-
-# Create network (run once)
-docker network create githook
-
-# Run redis
-docker run -d --restart unless-stopped --network githook --name redis -v ${WORKDIR}/githook/redis/redis.conf:/etc/redis/redis.conf -v ${WORKDIR}/redis_data:/data -t redis redis-server /etc/redis/redis.conf
-
-# Run the worker
-docker run -d --restart unless-stopped --network githook --name githook_worker -v ${WORKDIR}/gnailuy.com/:/app/gnailuy.com/ -v ${WORKDIR}/webroot:/app/webroot/ -v ${WORKDIR}/logs:/app/logs/ -t gnailuy/githook_worker
-
-# Run the server
-docker run -d --restart unless-stopped --network githook --name githook_server --env-file ./environment.rc -v ${WORKDIR}/logs:/app/logs/ -p 20182:20182 -t gnailuy/githook_server
-```
-
-Note for myself: I put the nginx server to the same network `githook` and use the nginx server to proxy the webhook requests now.
-It's not necessary to bind the `githook_server` port to the host and I've closed the port in the firewall.
-
-### Connect to redis
-
-``` bash
-docker run -it --network githook --rm redis redis-cli -h redis
-```
-
+Live credentials and host service definitions are intentionally not stored in this repository.

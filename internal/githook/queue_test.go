@@ -1,0 +1,51 @@
+package githook
+
+import (
+	"context"
+	"database/sql"
+	"path/filepath"
+	"testing"
+)
+
+func TestQueueDeduplicatesAndRecovers(t *testing.T) {
+	q, err := OpenQueue(filepath.Join(t.TempDir(), "q.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	ctx := context.Background()
+	sha := "0123456789012345678901234567890123456789"
+	added, err := q.Enqueue(ctx, "12345678-1234-1234-1234-123456789abc", 9, sha)
+	if err != nil || !added {
+		t.Fatalf("enqueue %v %v", added, err)
+	}
+	added, err = q.Enqueue(ctx, "22345678-1234-1234-1234-123456789abc", 9, sha)
+	if err != nil || added {
+		t.Fatalf("duplicate %v %v", added, err)
+	}
+	j, err := q.Claim(ctx)
+	if err != nil || j.RunID != 9 {
+		t.Fatalf("claim %+v %v", j, err)
+	}
+	if err = q.Recover(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = q.Claim(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = q.Claim(ctx); err != sql.ErrNoRows {
+		t.Fatalf("got %v", err)
+	}
+	if old, err := q.RefuseOlder(ctx, 9); err != nil || old {
+		t.Fatalf("empty state old=%v err=%v", old, err)
+	}
+	if err := q.MarkDeployed(ctx, 9, sha); err != nil {
+		t.Fatal(err)
+	}
+	if old, err := q.RefuseOlder(ctx, 8); err != nil || !old {
+		t.Fatalf("older run accepted old=%v err=%v", old, err)
+	}
+	if old, err := q.RefuseOlder(ctx, 10); err != nil || old {
+		t.Fatalf("newer run refused old=%v err=%v", old, err)
+	}
+}
