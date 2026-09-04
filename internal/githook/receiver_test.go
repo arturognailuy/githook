@@ -82,7 +82,7 @@ func TestReceiverPingAndLimits(t *testing.T) {
 	}
 }
 func TestListenAndServeRejectsNonLoopback(t *testing.T) {
-	err := ListenAndServe(context.Background(), "0.0.0.0:20182", http.NotFoundHandler())
+	err := ListenAndServe(context.Background(), "0.0.0.0:4000", http.NotFoundHandler())
 	if err == nil || !strings.Contains(err.Error(), "loopback") {
 		t.Fatalf("got %v", err)
 	}

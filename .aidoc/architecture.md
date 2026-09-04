@@ -46,7 +46,7 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 
 - The queue service MUST NOT receive a GitHub API token or release-directory write access.
 - The worker MUST NOT receive the webhook secret or expose an HTTP listener.
-- TCP 20182 and all maintenance endpoints MUST remain loopback-only; Caddy MUST forward only the exact webhook path.
+- The configured listener and all maintenance endpoints MUST remain loopback-only; Caddy MUST forward only the exact webhook path.
 - A webhook payload MUST NOT directly authorize a deployment.
 - At most one queue record may have `processing` status.
 - Queue maintenance MUST NOT delete the request currently being processed.

@@ -27,11 +27,11 @@ The queue service has no application authentication because it listens only on l
 
 ## What Operators Configure
 
-The queue-service identity needs `GITHOOK_WEBHOOK_SECRET`, `GITHOOK_DATABASE`, `GITHOOK_REPOSITORY`, `GITHOOK_WEBHOOK_PATH`, and a loopback `GITHOOK_LISTEN`. The deployment-worker identity needs a read-only `GITHUB_TOKEN`, access to the same embedded queue, release/current paths, workflow policy, and local/public smoke URLs.
+The queue-service identity needs `GITHOOK_WEBHOOK_SECRET`, `GITHOOK_DATABASE`, `GITHOOK_REPOSITORY`, `GITHOOK_WEBHOOK_PATH`, and a loopback `GITHOOK_LISTEN`. The listener defaults to `127.0.0.1:4000`; host-owned configuration selects the deployment port without recording it in the repository. The deployment-worker identity needs a read-only `GITHUB_TOKEN`, access to the same embedded queue, release/current paths, workflow policy, and local/public smoke URLs.
 
 The worker is a single long-running daemon. `Worker.Run` recovers an interrupted claim after restart, waits when no job is available, claims one request, completes or retries it, and then waits again. The queue enforces one processing request even if service supervision accidentally starts a second worker.
 
-The Caddy route forwards only `POST /hooks/github/gnailuy.com` to `127.0.0.1:20182`. Every other public host, path, or method returns the configured dummy response without reaching local maintenance operations.
+The Caddy route forwards only `POST /hooks/github/gnailuy.com` to the host-configured loopback listener. Every other public host, path, or method returns the configured dummy response without reaching local maintenance operations.
 
 ## How to Inspect and Edit Pending Work
 
