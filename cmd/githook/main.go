@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,13 +23,18 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	q, err := gh.OpenQueue(env("GITHOOK_DATABASE", "/var/lib/githook/githook.db"))
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fatal(fmt.Sprintf("resolve home directory: %v", err))
+	}
+	q, err := gh.OpenQueue(env("GITHOOK_DATABASE", filepath.Join(home, ".githook", "githook.db")))
 	if err != nil {
 		fatal(err.Error())
 	}
 	defer q.Close()
 	g := gh.GitHub{Repository: env("GITHOOK_REPOSITORY", "gnailuy/gnailuy.com"), Token: os.Getenv("GITHUB_TOKEN")}
-	d := gh.Deployer{ReleasesDir: env("GITHOOK_RELEASES", "/srv/gnailuy/releases"), CurrentLink: env("GITHOOK_CURRENT", "/srv/gnailuy/current"), SmokeURLs: split(os.Getenv("GITHOOK_SMOKE_URLS"))}
+	webRoot := filepath.Join(home, "www", "gnailuy")
+	d := gh.Deployer{ReleasesDir: env("GITHOOK_RELEASES", filepath.Join(webRoot, "releases")), CurrentLink: env("GITHOOK_CURRENT", filepath.Join(webRoot, "current")), SmokeURLs: split(os.Getenv("GITHOOK_SMOKE_URLS"))}
 	w := gh.Worker{Queue: q, GitHub: g, Deployer: d, WorkflowName: env("GITHOOK_WORKFLOW_NAME", "Verify site"), WorkflowPath: env("GITHOOK_WORKFLOW_PATH", ".github/workflows/verify.yml"), Branch: env("GITHOOK_BRANCH", "master")}
 	switch os.Args[1] {
 	case "serve":

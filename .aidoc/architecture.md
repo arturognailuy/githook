@@ -42,7 +42,7 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 
 `Deployer.Deploy` activates a complete release with an atomic symlink replacement. Post-activation smoke failure restores the previous link rather than leaving a partly trusted release active.
 
-`Worker.Run` treats metadata and artifact-integrity violations as terminal because repeating an untrusted input cannot make it valid. GitHub transport, download, deployment, and smoke-check failures are transient: the queue retries them five times after 1, 2, 4, 8, and 16 minutes, then retains the request as `failed` with its attempt count and last error.
+`Worker.Run` separates permanent validation failures from transient operational failures so invalid input is not retried forever while temporary outages can recover. The executable retry policy remains canonical in `Worker.Run` and its tests.
 
 ## Invariants
 

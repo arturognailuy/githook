@@ -3,9 +3,26 @@ package githook
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestOpenQueueCreatesPrivateParentDirectory(t *testing.T) {
+	parent := filepath.Join(t.TempDir(), ".githook")
+	q, err := OpenQueue(filepath.Join(parent, "githook.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	info, err := os.Stat(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0700 {
+		t.Fatalf("queue directory mode = %o, want 700", got)
+	}
+}
 
 func TestQueueDeduplicatesAndRecovers(t *testing.T) {
 	q, err := OpenQueue(filepath.Join(t.TempDir(), "q.db"))
