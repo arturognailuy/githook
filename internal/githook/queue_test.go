@@ -49,3 +49,30 @@ func TestQueueDeduplicatesAndRecovers(t *testing.T) {
 		t.Fatalf("newer run refused old=%v err=%v", old, err)
 	}
 }
+
+func TestQueueRetainsFailedJobsForInspection(t *testing.T) {
+	q, err := OpenQueue(filepath.Join(t.TempDir(), "q.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	ctx := context.Background()
+	const deliveryID = "12345678-1234-1234-1234-123456789abc"
+	if added, err := q.Enqueue(ctx, deliveryID, 9, "0123456789012345678901234567890123456789"); err != nil || !added {
+		t.Fatalf("enqueue %v %v", added, err)
+	}
+	j, err := q.Claim(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Fail(ctx, j.DeliveryID, "permanent failure"); err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := q.Pending(ctx)
+	if err != nil || len(jobs) != 1 || jobs[0].Status != "failed" || jobs[0].LastError != "permanent failure" {
+		t.Fatalf("jobs=%+v err=%v", jobs, err)
+	}
+	if _, err := q.Claim(ctx); err != sql.ErrNoRows {
+		t.Fatalf("failed job was claimable: %v", err)
+	}
+}

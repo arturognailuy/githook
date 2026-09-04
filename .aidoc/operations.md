@@ -27,9 +27,9 @@ The queue service has no application authentication because it listens only on l
 
 ## What Operators Configure
 
-The queue-service identity needs `GITHOOK_WEBHOOK_SECRET`, `GITHOOK_DATABASE`, `GITHOOK_REPOSITORY`, `GITHOOK_WEBHOOK_PATH`, and a loopback `GITHOOK_LISTEN`. The listener defaults to `127.0.0.1:4000`; host-owned configuration selects the deployment port without recording it in the repository. The deployment-worker identity needs a read-only `GITHUB_TOKEN`, access to the same embedded queue, release/current paths, workflow policy, and local/public smoke URLs.
+The host stores two root-owned mode-0600 environment files: `/etc/githook/receiver.env` and `/etc/githook/worker.env`. The receiver file supplies `GITHOOK_WEBHOOK_SECRET`, `GITHOOK_DATABASE`, `GITHOOK_REPOSITORY`, `GITHOOK_WEBHOOK_PATH`, and a loopback `GITHOOK_LISTEN`; the listener defaults to `127.0.0.1:4000`, and the host-owned value selects the deployment port without recording it in the repository. The worker file supplies a read-only `GITHUB_TOKEN`, the shared `GITHOOK_DATABASE`, release/current paths, workflow policy, and local/public smoke URLs. Each systemd unit loads only its own file, so the receiver never receives the worker token and the worker never receives the webhook secret.
 
-The worker is a single long-running daemon. `Worker.Run` recovers an interrupted claim after restart, waits when no job is available, claims one request, completes or retries it, and then waits again. The queue enforces one processing request even if service supervision accidentally starts a second worker.
+The worker is a single long-running daemon. `Worker.Run` recovers an interrupted claim after restart, waits when no job is available, claims one request, and then waits again. Permanent metadata or integrity failures become `failed` immediately. Transient GitHub, network, deployment, or smoke failures retry after 1, 2, 4, 8, and 16 minutes; failure after the fifth retry remains `failed`. The queue enforces one processing request even if service supervision accidentally starts a second worker.
 
 The Caddy route forwards only `POST /hooks/github/gnailuy.com` to the host-configured loopback listener. Every other public host, path, or method returns the configured dummy response without reaching local maintenance operations.
 
@@ -39,7 +39,7 @@ The loopback queue service provides these local-only operations:
 
 | Method and path | Effect |
 |---|---|
-| `GET /maintenance/queue` | List queued and currently processing requests, newest first |
+| `GET /maintenance/queue` | List queued, currently processing, and failed requests, newest first |
 | `GET /maintenance/queue/peek` | Show the next queued request without claiming it |
 | `DELETE /maintenance/queue/<delivery-id>` | Drop one queued request |
 | `DELETE /maintenance/queue` | Clear all queued requests |
@@ -50,6 +50,8 @@ Queue deletion never removes the request currently being processed. Stopping the
 ## How to Recover
 
 Restarting the worker requeues a request left in `processing`. `githook deploy-run --sha <full-sha> <run-id>` performs the same authoritative verification and deployment path for manual replay.
+
+Failed records retain their attempt count and last error for diagnosis. An operator may manually replay a corrected or recovered run with `deploy-run`; reconciliation can independently deploy a newer eligible run without deleting the failed evidence.
 
 Rotate the webhook secret by installing the new queue-service secret before updating the one existing GitHub webhook, then prove a signed `ping`. Rotate the GitHub token independently because the queue service never uses it.
 

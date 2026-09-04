@@ -4,10 +4,22 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
+
+const MaxTransientRetries = 5
+
+type permanentError struct{ error }
+
+func permanent(err error) error { return permanentError{error: err} }
+
+func isPermanent(err error) bool {
+	var target permanentError
+	return errors.As(err, &target)
+}
 
 type Worker struct {
 	Queue                              *Queue
@@ -23,7 +35,7 @@ func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string)
 			return err
 		}
 		if older {
-			return fmt.Errorf("run is older than or equal to deployed state")
+			return permanent(fmt.Errorf("run is older than or equal to deployed state"))
 		}
 	}
 	r, err := w.GitHub.Run(ctx, runID)
@@ -31,7 +43,7 @@ func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string)
 		return err
 	}
 	if r.ID != runID || r.Repository.FullName != w.GitHub.Repository || r.Name != w.WorkflowName || r.Path != w.WorkflowPath || r.Event != "push" || r.HeadBranch != w.Branch || r.Status != "completed" || r.Conclusion != "success" || !strings.EqualFold(r.HeadSHA, expectedSHA) {
-		return fmt.Errorf("run metadata is not eligible")
+		return permanent(fmt.Errorf("run metadata is not eligible"))
 	}
 	name := "site-release-" + strings.ToLower(r.HeadSHA)
 	a, err := w.GitHub.Artifact(ctx, runID, name)
@@ -44,16 +56,16 @@ func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string)
 	}
 	if strings.HasPrefix(a.Digest, "sha256:") {
 		if err := verifyDigest(data, strings.TrimPrefix(a.Digest, "sha256:")); err != nil {
-			return err
+			return permanent(err)
 		}
 	}
 	z, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return err
+		return permanent(err)
 	}
 	bundle, err := VerifyBundle(z, w.GitHub.Repository, runID, r.HeadSHA)
 	if err != nil {
-		return err
+		return permanent(err)
 	}
 	if err := w.Deployer.Deploy(ctx, r.HeadSHA, bundle.Archive); err != nil {
 		return err
@@ -63,6 +75,24 @@ func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string)
 	}
 	return nil
 }
+
+func retryDelay(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	if attempt > MaxTransientRetries {
+		attempt = MaxTransientRetries
+	}
+	return time.Minute << (attempt - 1)
+}
+
+func (w Worker) recordFailure(ctx context.Context, j Job, err error) error {
+	if isPermanent(err) || j.Attempts > MaxTransientRetries {
+		return w.Queue.Fail(ctx, j.DeliveryID, err.Error())
+	}
+	return w.Queue.Retry(ctx, j.DeliveryID, err.Error(), retryDelay(j.Attempts))
+}
+
 func verifyDigest(data []byte, want string) error {
 	if !strings.EqualFold(sha256Hex(data), want) {
 		return fmt.Errorf("GitHub artifact digest mismatch")
@@ -84,9 +114,13 @@ func (w Worker) Run(ctx context.Context) error {
 			}
 		}
 		if err = w.ProcessRun(ctx, j.RunID, j.HeadSHA); err != nil {
-			_ = w.Queue.Retry(ctx, j.DeliveryID, err.Error(), time.Minute)
+			if queueErr := w.recordFailure(ctx, j, err); queueErr != nil {
+				return queueErr
+			}
 			continue
 		}
-		_ = w.Queue.Complete(ctx, j.DeliveryID)
+		if err := w.Queue.Complete(ctx, j.DeliveryID); err != nil {
+			return err
+		}
 	}
 }

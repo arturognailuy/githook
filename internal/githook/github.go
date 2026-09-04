@@ -83,7 +83,7 @@ func (g GitHub) Artifact(ctx context.Context, runID int64, expected string) (Art
 		}
 	}
 	if len(matches) != 1 {
-		return Artifact{}, fmt.Errorf("expected one unexpired artifact %q, got %d", expected, len(matches))
+		return Artifact{}, permanent(fmt.Errorf("expected one unexpired artifact %q, got %d", expected, len(matches)))
 	}
 	return matches[0], nil
 }

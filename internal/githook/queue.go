@@ -93,6 +93,11 @@ func (q *Queue) Retry(ctx context.Context, deliveryID, message string, delay tim
 	return err
 }
 
+func (q *Queue) Fail(ctx context.Context, deliveryID, message string) error {
+	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status='failed',last_error=? WHERE delivery_id=?`, message, deliveryID)
+	return err
+}
+
 func (q *Queue) Recover(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status='queued',available_at=? WHERE status='processing'`, time.Now().Unix())
 	return err
@@ -100,7 +105,7 @@ func (q *Queue) Recover(ctx context.Context) error {
 
 func (q *Queue) Pending(ctx context.Context) ([]Job, error) {
 	rows, err := q.db.QueryContext(ctx, `SELECT delivery_id,run_id,head_sha,status,attempts,available_at,created_at,last_error
-FROM jobs WHERE status IN ('queued','processing') ORDER BY run_id DESC`)
+FROM jobs WHERE status IN ('queued','processing','failed') ORDER BY run_id DESC`)
 	if err != nil {
 		return nil, err
 	}

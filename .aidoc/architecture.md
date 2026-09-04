@@ -42,6 +42,8 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 
 `Deployer.Deploy` activates a complete release with an atomic symlink replacement. Post-activation smoke failure restores the previous link rather than leaving a partly trusted release active.
 
+`Worker.Run` treats metadata and artifact-integrity violations as terminal because repeating an untrusted input cannot make it valid. GitHub transport, download, deployment, and smoke-check failures are transient: the queue retries them five times after 1, 2, 4, 8, and 16 minutes, then retains the request as `failed` with its attempt count and last error.
+
 ## Invariants
 
 - The queue service MUST NOT receive a GitHub API token or release-directory write access.
@@ -50,6 +52,7 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 - A webhook payload MUST NOT directly authorize a deployment.
 - At most one queue record may have `processing` status.
 - Queue maintenance MUST NOT delete the request currently being processed.
+- Permanent failures and exhausted transient retries MUST remain inspectable as `failed` queue records rather than loop forever or disappear.
 - Release archives MUST contain only relative regular files and directories; links and traversal paths are rejected.
 - A release directory MUST be immutable after creation, and activation MUST use one atomic link replacement.
 - Duplicate delivery IDs, duplicate run IDs, and older releases MUST NOT replace newer deployed state.
