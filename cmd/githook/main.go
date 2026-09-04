@@ -33,7 +33,8 @@ func main() {
 	switch os.Args[1] {
 	case "serve":
 		r := gh.Receiver{Secret: []byte(os.Getenv("GITHOOK_WEBHOOK_SECRET")), Repository: g.Repository, Queue: q}
-		fatalIf(gh.ListenAndServe(ctx, env("GITHOOK_LISTEN", "127.0.0.1:20182"), r))
+		s := gh.Service{WebhookPath: env("GITHOOK_WEBHOOK_PATH", gh.DefaultWebhookPath), Receiver: r, Queue: q}
+		fatalIf(gh.ListenAndServe(ctx, env("GITHOOK_LISTEN", "127.0.0.1:20182"), s))
 	case "worker":
 		requireWorkerConfig(g.Token, d.SmokeURLs)
 		fatalIf(w.Run(ctx))

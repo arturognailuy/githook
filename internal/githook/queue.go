@@ -10,12 +10,19 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+var ErrQueueEmpty = sql.ErrNoRows
+
 type Job struct {
-	DeliveryID string
-	RunID      int64
-	HeadSHA    string
-	Attempts   int
+	DeliveryID string `json:"delivery_id"`
+	RunID      int64  `json:"run_id"`
+	HeadSHA    string `json:"head_sha"`
+	Status     string `json:"status,omitempty"`
+	Attempts   int    `json:"attempts"`
+	Available  int64  `json:"available_at,omitempty"`
+	Created    int64  `json:"created_at,omitempty"`
+	LastError  string `json:"last_error,omitempty"`
 }
+
 type Queue struct{ db *sql.DB }
 
 func OpenQueue(path string) (*Queue, error) {
@@ -27,13 +34,16 @@ func OpenQueue(path string) (*Queue, error) {
 	if _, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
 CREATE TABLE IF NOT EXISTS jobs (delivery_id TEXT PRIMARY KEY, run_id INTEGER NOT NULL UNIQUE, head_sha TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL, created_at INTEGER NOT NULL, last_error TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS jobs_claim ON jobs(status, available_at, run_id);
+CREATE UNIQUE INDEX IF NOT EXISTS one_processing_job ON jobs(status) WHERE status='processing';
 CREATE TABLE IF NOT EXISTS deployment_state (singleton INTEGER PRIMARY KEY CHECK(singleton=1), run_id INTEGER NOT NULL, head_sha TEXT NOT NULL, deployed_at INTEGER NOT NULL);`); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize queue: %w", err)
 	}
 	return q, nil
 }
+
 func (q *Queue) Close() error { return q.db.Close() }
+
 func (q *Queue) Enqueue(ctx context.Context, deliveryID string, runID int64, headSHA string) (bool, error) {
 	now := time.Now().Unix()
 	r, err := q.db.ExecContext(ctx, `INSERT OR IGNORE INTO jobs(delivery_id,run_id,head_sha,available_at,created_at) VALUES(?,?,?,?,?)`, deliveryID, runID, headSHA, now, now)
@@ -43,6 +53,7 @@ func (q *Queue) Enqueue(ctx context.Context, deliveryID string, runID int64, hea
 	n, err := r.RowsAffected()
 	return n == 1, err
 }
+
 func (q *Queue) Claim(ctx context.Context) (Job, error) {
 	tx, err := q.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -50,7 +61,9 @@ func (q *Queue) Claim(ctx context.Context) (Job, error) {
 	}
 	defer tx.Rollback()
 	var j Job
-	err = tx.QueryRowContext(ctx, `SELECT delivery_id,run_id,head_sha,attempts FROM jobs WHERE status='queued' AND available_at<=? ORDER BY run_id DESC LIMIT 1`, time.Now().Unix()).Scan(&j.DeliveryID, &j.RunID, &j.HeadSHA, &j.Attempts)
+	err = tx.QueryRowContext(ctx, `SELECT delivery_id,run_id,head_sha,attempts FROM jobs
+WHERE status='queued' AND available_at<=? AND NOT EXISTS (SELECT 1 FROM jobs WHERE status='processing')
+ORDER BY run_id DESC LIMIT 1`, time.Now().Unix()).Scan(&j.DeliveryID, &j.RunID, &j.HeadSHA, &j.Attempts)
 	if err != nil {
 		return Job{}, err
 	}
@@ -66,20 +79,71 @@ func (q *Queue) Claim(ctx context.Context) (Job, error) {
 		return Job{}, err
 	}
 	j.Attempts++
+	j.Status = "processing"
 	return j, nil
 }
+
 func (q *Queue) Complete(ctx context.Context, deliveryID string) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status='done',last_error='' WHERE delivery_id=?`, deliveryID)
 	return err
 }
+
 func (q *Queue) Retry(ctx context.Context, deliveryID, message string, delay time.Duration) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status='queued',last_error=?,available_at=? WHERE delivery_id=?`, message, time.Now().Add(delay).Unix(), deliveryID)
 	return err
 }
+
 func (q *Queue) Recover(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status='queued',available_at=? WHERE status='processing'`, time.Now().Unix())
 	return err
 }
+
+func (q *Queue) Pending(ctx context.Context) ([]Job, error) {
+	rows, err := q.db.QueryContext(ctx, `SELECT delivery_id,run_id,head_sha,status,attempts,available_at,created_at,last_error
+FROM jobs WHERE status IN ('queued','processing') ORDER BY run_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	jobs := make([]Job, 0)
+	for rows.Next() {
+		var j Job
+		if err := rows.Scan(&j.DeliveryID, &j.RunID, &j.HeadSHA, &j.Status, &j.Attempts, &j.Available, &j.Created, &j.LastError); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
+func (q *Queue) Peek(ctx context.Context) (Job, error) {
+	var j Job
+	err := q.db.QueryRowContext(ctx, `SELECT delivery_id,run_id,head_sha,status,attempts,available_at,created_at,last_error
+FROM jobs WHERE status='queued' ORDER BY run_id DESC LIMIT 1`).Scan(&j.DeliveryID, &j.RunID, &j.HeadSHA, &j.Status, &j.Attempts, &j.Available, &j.Created, &j.LastError)
+	return j, err
+}
+
+func (q *Queue) Drop(ctx context.Context, deliveryID string) (bool, error) {
+	r, err := q.db.ExecContext(ctx, `DELETE FROM jobs WHERE delivery_id=? AND status='queued'`, deliveryID)
+	if err != nil {
+		return false, err
+	}
+	n, err := r.RowsAffected()
+	return n == 1, err
+}
+
+func (q *Queue) Clear(ctx context.Context, keepNewest bool) (int64, error) {
+	query := `DELETE FROM jobs WHERE status='queued'`
+	if keepNewest {
+		query = `DELETE FROM jobs WHERE status='queued' AND delivery_id NOT IN (SELECT delivery_id FROM jobs WHERE status='queued' ORDER BY run_id DESC LIMIT 1)`
+	}
+	r, err := q.db.ExecContext(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
+}
+
 func (q *Queue) RefuseOlder(ctx context.Context, runID int64) (bool, error) {
 	var current int64
 	err := q.db.QueryRowContext(ctx, `SELECT run_id FROM deployment_state WHERE singleton=1`).Scan(&current)
@@ -88,6 +152,7 @@ func (q *Queue) RefuseOlder(ctx context.Context, runID int64) (bool, error) {
 	}
 	return runID <= current, err
 }
+
 func (q *Queue) MarkDeployed(ctx context.Context, runID int64, headSHA string) error {
 	_, err := q.db.ExecContext(ctx, `INSERT INTO deployment_state(singleton,run_id,head_sha,deployed_at) VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET run_id=excluded.run_id,head_sha=excluded.head_sha,deployed_at=excluded.deployed_at WHERE excluded.run_id>deployment_state.run_id`, runID, headSHA, time.Now().Unix())
 	return err

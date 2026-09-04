@@ -1,8 +1,8 @@
 # Agent Instructions
 
 - Read `.aidoc/INDEX.md` before changing runtime behavior.
-- Preserve the receiver/worker privilege boundary: the receiver owns only the webhook secret and queue-write authority; the worker owns only GitHub artifact-read and release activation authority.
+- Preserve the queue-service/worker privilege boundary: the loopback queue service owns only the webhook secret and embedded queue; the worker owns only GitHub artifact-read and release activation authority.
 - Treat webhook payloads as notifications. Re-read deployment facts from GitHub before downloading or activating anything.
-- Keep TCP 20182 loopback-only and keep secrets out of source, arguments, logs, fixtures, and documentation.
+- Keep TCP 20182 and every queue maintenance endpoint loopback-only; Caddy may forward only the exact webhook path. Keep secrets out of source, arguments, logs, fixtures, and documentation.
 - Run `go test ./...`, `go vet ./...`, and `go build ./cmd/githook` before opening a pull request.
 - Update `.aidoc/` whenever architecture, security invariants, or operator workflows change.
