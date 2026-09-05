@@ -26,9 +26,13 @@ type Worker struct {
 	GitHub                             GitHub
 	Deployer                           Deployer
 	WorkflowName, WorkflowPath, Branch string
+	ArtifactPrefix                     string
 }
 
 func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string) error {
+	if w.ArtifactPrefix == "" {
+		return permanent(fmt.Errorf("artifact prefix is required"))
+	}
 	if w.Queue != nil {
 		older, err := w.Queue.RefuseOlder(ctx, runID)
 		if err != nil {
@@ -45,7 +49,7 @@ func (w Worker) ProcessRun(ctx context.Context, runID int64, expectedSHA string)
 	if r.ID != runID || r.Repository.FullName != w.GitHub.Repository || r.Name != w.WorkflowName || r.Path != w.WorkflowPath || r.Event != "push" || r.HeadBranch != w.Branch || r.Status != "completed" || r.Conclusion != "success" || !strings.EqualFold(r.HeadSHA, expectedSHA) {
 		return permanent(fmt.Errorf("run metadata is not eligible"))
 	}
-	name := "site-release-" + strings.ToLower(r.HeadSHA)
+	name := w.ArtifactPrefix + strings.ToLower(r.HeadSHA)
 	a, err := w.GitHub.Artifact(ctx, runID, name)
 	if err != nil {
 		return err

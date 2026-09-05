@@ -22,7 +22,7 @@ Githook turns a signed `workflow_run` notification into a verified immutable rel
 
 ## Why Githook Uses Two Daemons
 
-The queue service processes attacker-controlled Internet requests forwarded by one exact Caddy route. The deployment worker reads a GitHub token and changes the active release. Separate host identities prevent public input from inheriting deployment authority and prevent the privileged worker from becoming a network service.
+The queue service processes attacker-controlled Internet requests forwarded by one exact reverse-proxy route. The deployment worker reads a GitHub token and changes the active release. Separate host identities prevent public input from inheriting deployment authority and prevent the privileged worker from becoming a network service.
 
 The embedded SQLite file gives the low-volume queue durable transactions without Redis or a database server. SQLite remains an implementation detail owned by the queue service and worker; no separate database lifecycle exists.
 
@@ -30,7 +30,7 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 
 ## What the Queue Service Owns
 
-`Service.ServeHTTP` exposes the configured webhook path and local maintenance paths on one loopback listener. Caddy forwards only the webhook path, so maintenance operations never cross the public routing boundary.
+`Service.ServeHTTP` exposes the configured webhook path and local maintenance paths on one loopback listener. The host's reverse proxy forwards only the webhook path, so maintenance operations never cross the public routing boundary. Githook does not own or configure that proxy.
 
 `Receiver.ServeHTTP` verifies the raw-body HMAC-SHA256 signature before JSON parsing, enforces the request envelope, and deduplicates delivery and run identifiers. Every webhook response body is the same dummy value, `42`, while HTTP status codes retain operational meaning.
 
@@ -48,7 +48,7 @@ The webhook is only a wake-up signal because signed payloads can be valid yet st
 
 - The queue service MUST NOT receive a GitHub API token or release-directory write access.
 - The worker MUST NOT receive the webhook secret or expose an HTTP listener.
-- The configured listener and all maintenance endpoints MUST remain loopback-only; Caddy MUST forward only the exact webhook path.
+- The configured listener and all maintenance endpoints MUST remain loopback-only; an external reverse proxy MUST forward only the exact webhook path.
 - A webhook payload MUST NOT directly authorize a deployment.
 - At most one queue record may have `processing` status.
 - Queue maintenance MUST NOT delete the request currently being processed.

@@ -16,9 +16,9 @@ func TestServiceRoutesWebhookAndHidesUnknownPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer q.Close()
-	r := Receiver{Secret: []byte("s"), Repository: "gnailuy/gnailuy.com", Queue: q}
+	r := Receiver{Secret: []byte("s"), Repository: "example/project", Queue: q}
 	s := Service{Receiver: r, Queue: q}
-	body := `{"repository":{"full_name":"gnailuy/gnailuy.com"}}`
+	body := `{"repository":{"full_name":"example/project"}}`
 	req := httptest.NewRequest(http.MethodPost, DefaultWebhookPath, http.NoBody)
 	req.Body = ioNopCloser(body)
 	req.Header.Set("Content-Type", "application/json")

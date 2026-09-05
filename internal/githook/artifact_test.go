@@ -47,7 +47,7 @@ func TestVerifyBundle(t *testing.T) {
 	sha := "0123456789012345678901234567890123456789"
 	a := tarball(t, "index.html", tar.TypeReg)
 	sum := sha256.Sum256(a)
-	m := Manifest{Repository: "gnailuy/gnailuy.com", WorkflowRunID: 7, HeadSHA: sha, Archive: "site.tar.gz"}
+	m := Manifest{Repository: "example/project", WorkflowRunID: 7, HeadSHA: sha, Archive: "bundle.tar.gz"}
 	b, err := VerifyBundle(bundleZip(t, a, m, hex.EncodeToString(sum[:])), m.Repository, 7, sha)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestVerifyBundle(t *testing.T) {
 }
 func TestVerifyBundleRejectsTamperAndTraversal(t *testing.T) {
 	sha := "0123456789012345678901234567890123456789"
-	m := Manifest{Repository: "gnailuy/gnailuy.com", WorkflowRunID: 7, HeadSHA: sha, Archive: "site.tar.gz"}
+	m := Manifest{Repository: "example/project", WorkflowRunID: 7, HeadSHA: sha, Archive: "bundle.tar.gz"}
 	a := tarball(t, "index.html", tar.TypeReg)
 	if _, err := VerifyBundle(bundleZip(t, a, m, "00"), m.Repository, 7, sha); err == nil {
 		t.Fatal("accepted bad checksum")

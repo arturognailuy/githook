@@ -39,9 +39,9 @@ func request(t *testing.T, r Receiver, method, event, body, sig string) *httptes
 	return w
 }
 func TestReceiverWorkflowRunAndDedup(t *testing.T) {
-	body := `{"action":"completed","repository":{"full_name":"gnailuy/gnailuy.com"},"workflow_run":{"id":42,"head_sha":"0123456789012345678901234567890123456789"}}`
+	body := `{"action":"completed","repository":{"full_name":"example/project"},"workflow_run":{"id":42,"head_sha":"0123456789012345678901234567890123456789"}}`
 	f := &fakeQueue{added: true}
-	r := Receiver{Secret: []byte("test-secret"), Repository: "gnailuy/gnailuy.com", Queue: f}
+	r := Receiver{Secret: []byte("test-secret"), Repository: "example/project", Queue: f}
 	if got := request(t, r, http.MethodPost, "workflow_run", body, sign(body, "test-secret")).Code; got != http.StatusAccepted {
 		t.Fatalf("got %d", got)
 	}
@@ -54,8 +54,8 @@ func TestReceiverWorkflowRunAndDedup(t *testing.T) {
 	}
 }
 func TestReceiverSecurityChecks(t *testing.T) {
-	body := `{"repository":{"full_name":"gnailuy/gnailuy.com"}}`
-	r := Receiver{Secret: []byte("test-secret"), Repository: "gnailuy/gnailuy.com", Queue: &fakeQueue{}}
+	body := `{"repository":{"full_name":"example/project"}}`
+	r := Receiver{Secret: []byte("test-secret"), Repository: "example/project", Queue: &fakeQueue{}}
 	tests := []struct {
 		name, method, event, sig string
 		want                     int
@@ -70,8 +70,8 @@ func TestReceiverSecurityChecks(t *testing.T) {
 	}
 }
 func TestReceiverPingAndLimits(t *testing.T) {
-	body := `{"repository":{"full_name":"gnailuy/gnailuy.com"}}`
-	r := Receiver{Secret: []byte("s"), Repository: "gnailuy/gnailuy.com", Queue: &fakeQueue{}, MaxBody: int64(len(body))}
+	body := `{"repository":{"full_name":"example/project"}}`
+	r := Receiver{Secret: []byte("s"), Repository: "example/project", Queue: &fakeQueue{}, MaxBody: int64(len(body))}
 	response := request(t, r, http.MethodPost, "ping", body, sign(body, "s"))
 	if response.Code != http.StatusOK || response.Body.String() != "42\n" {
 		t.Fatalf("got status=%d body=%q", response.Code, response.Body.String())
@@ -89,8 +89,8 @@ func TestListenAndServeRejectsNonLoopback(t *testing.T) {
 }
 
 func TestReceiverQueueFailure(t *testing.T) {
-	body := `{"action":"completed","repository":{"full_name":"gnailuy/gnailuy.com"},"workflow_run":{"id":42,"head_sha":"0123456789012345678901234567890123456789"}}`
-	r := Receiver{Secret: []byte("s"), Repository: "gnailuy/gnailuy.com", Queue: &fakeQueue{err: errors.New("down")}}
+	body := `{"action":"completed","repository":{"full_name":"example/project"},"workflow_run":{"id":42,"head_sha":"0123456789012345678901234567890123456789"}}`
+	r := Receiver{Secret: []byte("s"), Repository: "example/project", Queue: &fakeQueue{err: errors.New("down")}}
 	if got := request(t, r, http.MethodPost, "workflow_run", body, sign(body, "s")).Code; got != 503 {
 		t.Fatalf("got %d", got)
 	}

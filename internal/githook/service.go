@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const DefaultWebhookPath = "/hooks/github/gnailuy.com"
+const DefaultWebhookPath = "/hooks/github"
 const queuePath = "/maintenance/queue"
 
 type Service struct {

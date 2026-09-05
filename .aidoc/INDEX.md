@@ -8,7 +8,7 @@ dependencies: []
 
 # Githook Documentation
 
-Githook is a self-contained, host-local GitHub Actions artifact deployer for `gnailuy.com`. This index routes maintainers to the trust boundaries and operating workflow that code alone cannot explain.
+Githook is a self-contained, host-local GitHub Actions artifact deployer. This index routes maintainers to the trust boundaries and operating workflow that code alone cannot explain.
 
 ## Related Docs
 

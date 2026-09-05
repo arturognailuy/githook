@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -68,6 +69,19 @@ func (g GitHub) Run(ctx context.Context, id int64) (Run, error) {
 	var r Run
 	err := g.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d", g.Repository, id), &r)
 	return r, err
+}
+func (g GitHub) LatestSuccessfulRun(ctx context.Context, workflowPath, branch string) (Run, error) {
+	var v struct {
+		Runs []Run `json:"workflow_runs"`
+	}
+	path := fmt.Sprintf("/repos/%s/actions/workflows/%s/runs?branch=%s&event=push&status=success&per_page=1", g.Repository, url.PathEscape(workflowPath), url.QueryEscape(branch))
+	if err := g.get(ctx, path, &v); err != nil {
+		return Run{}, err
+	}
+	if len(v.Runs) != 1 {
+		return Run{}, fmt.Errorf("no eligible run")
+	}
+	return v.Runs[0], nil
 }
 func (g GitHub) Artifact(ctx context.Context, runID int64, expected string) (Artifact, error) {
 	var v struct {
