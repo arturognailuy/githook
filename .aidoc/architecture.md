@@ -22,7 +22,7 @@ Githook turns a signed `workflow_run` notification into a verified immutable rel
 
 ## Why Githook Uses Two Daemons
 
-The queue service processes attacker-controlled Internet requests forwarded by one exact reverse-proxy route. The deployment worker reads a GitHub token and changes the active release. Separate host identities prevent public input from inheriting deployment authority and prevent the privileged worker from becoming a network service.
+The queue service processes attacker-controlled Internet requests forwarded by one exact reverse-proxy route. The deployment worker reads a GitHub token and changes the active release. Separate units load different credential files and receive different writable paths, so the public-facing process does not inherit deployment configuration and the deployment process does not become a network service. When both units run under one service account, this is process and sandbox separation rather than a separate Unix-identity boundary.
 
 The embedded SQLite file gives the low-volume queue durable transactions without Redis or a database server. SQLite remains an implementation detail owned by the queue service and worker; no separate database lifecycle exists.
 

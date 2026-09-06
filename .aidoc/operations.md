@@ -7,6 +7,7 @@ entry_points:
   - packaging/systemd/githook-worker.service
 dependencies:
   - .aidoc/architecture.md
+  - .aidoc/host-bootstrap.md
 ---
 
 # Operations
@@ -18,6 +19,7 @@ Githook runs from user-owned files under a user-level systemd manager. Only the 
 | Document | Relationship |
 |---|---|
 | [Architecture](architecture.md) | Security and serialization boundaries the host configuration preserves |
+| [Host Bootstrap](host-bootstrap.md) | Ordered empty-host installation and acceptance checks |
 | [INDEX](INDEX.md) | Documentation discovery |
 
 ## Why Runtime Files Stay User-Owned
@@ -55,3 +57,5 @@ Stop the worker before maintenance when an operator needs a stable pending set. 
 Rotate the webhook secret by installing the new receiver credential before updating the one existing GitHub webhook, then prove a signed `ping`. Rotate the GitHub token independently because the queue service never uses it.
 
 Retain previous immutable release directories until a newer release survives smoke and restart checks. A failed smoke check restores the previous active symlink; host recovery may also repoint `current` to a retained release.
+
+Use [Host Bootstrap](host-bootstrap.md) when no working installation exists. Host Bootstrap separates the repository-owned procedure from environment-specific network, path, and credential values.

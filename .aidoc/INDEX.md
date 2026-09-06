@@ -16,9 +16,10 @@ Githook is a self-contained, host-local GitHub Actions artifact deployer. This i
 |---|---|
 | [Architecture](architecture.md) | Components, trust boundaries, and deployment invariants |
 | [Operations](operations.md) | Installation, recovery, rotation, and failure handling |
+| [Host Bootstrap](host-bootstrap.md) | Recreate a production installation from an empty supported Linux host |
 
 ## Reading Chains
 
 - **Change receiver or worker behavior:** Architecture → `internal/githook/receiver.go` or `internal/githook/worker.go` → tests.
 - **Change deployment or artifact validation:** Architecture → `internal/githook/artifact.go` → `internal/githook/deploy.go` → tests.
-- **Install or recover a host:** Operations → `packaging/systemd/` → `cmd/githook/main.go`.
+- **Install or recover a host:** Architecture → Operations → Host Bootstrap → `packaging/config/` → `packaging/systemd/`.
