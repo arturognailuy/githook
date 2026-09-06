@@ -1,0 +1,10 @@
+# Copy to ~/.config/githook/runtime.conf and replace the example values.
+GITHOOK_REPOSITORY=owner/repository
+GITHOOK_WORKFLOW_NAME="Build release"
+GITHOOK_WORKFLOW_PATH=.github/workflows/release.yml
+GITHOOK_BRANCH=main
+GITHOOK_ARTIFACT_PREFIX=release-
+GITHOOK_SMOKE_URLS=http://127.0.0.1:8080/health
+# Optional: GITHOOK_WEBHOOK_PATH=/hooks/github
+# Optional: GITHOOK_RELEASES=/path/to/releases
+# Optional: GITHOOK_CURRENT=/path/to/current

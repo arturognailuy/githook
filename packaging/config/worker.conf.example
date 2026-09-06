@@ -1,0 +1,2 @@
+# Copy to /etc/githook/worker.conf and replace the placeholder.
+GITHUB_TOKEN=replace-with-read-only-actions-token

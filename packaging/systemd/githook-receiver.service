@@ -1,0 +1,19 @@
+[Unit]
+Description=Githook webhook receiver
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/githook/receiver.conf
+EnvironmentFile=%h/.config/githook/runtime.conf
+ExecStart=%h/.local/bin/githook serve
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.githook
+
+[Install]
+WantedBy=default.target

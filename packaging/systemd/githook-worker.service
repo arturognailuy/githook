@@ -1,0 +1,20 @@
+[Unit]
+Description=Githook deployment worker
+After=network-online.target githook-receiver.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/githook/worker.conf
+EnvironmentFile=%h/.config/githook/runtime.conf
+ExecStart=%h/.local/bin/githook worker
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.githook %h/.local/share/githook
+
+[Install]
+WantedBy=default.target
