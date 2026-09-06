@@ -10,6 +10,16 @@ import (
 	"testing"
 )
 
+func TestExtractTarGzAcceptsDirectoryWithTrailingSlash(t *testing.T) {
+	root := t.TempDir()
+	if err := extractTarGz(tarball(t, "about/", tar.TypeDir), root); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(filepath.Join(root, "about")); err != nil || !info.IsDir() {
+		t.Fatalf("directory not extracted: info=%v err=%v", info, err)
+	}
+}
+
 func TestDeployAndRollback(t *testing.T) {
 	root := t.TempDir()
 	t.Cleanup(func() {
