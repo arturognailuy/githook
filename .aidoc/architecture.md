@@ -5,8 +5,7 @@ entry_points:
   - internal/githook/service.go
   - internal/githook/worker.go
   - internal/githook/deploy.go
-dependencies:
-  - .aidoc/operations.md
+dependencies: []
 ---
 
 # Architecture

@@ -7,7 +7,6 @@ entry_points:
   - packaging/systemd/githook-receiver.service
 dependencies:
   - .aidoc/architecture.md
-  - .aidoc/operations.md
 ---
 
 # Host Bootstrap
@@ -19,7 +18,7 @@ Githook can be rebuilt on an empty supported Linux host from this repository plu
 | Document | Relationship |
 |---|---|
 | [Architecture](architecture.md) | Explains the trust, queue, and activation invariants |
-| [Operations](operations.md) | Defines configuration ownership, maintenance, rotation, and recovery |
+| [Operations](operations.md) | Day-two maintenance after bootstrap succeeds |
 | [INDEX](INDEX.md) | Documentation discovery and reading chains |
 
 ## Why Bootstrap Has Explicit Gates
@@ -34,14 +33,14 @@ Hostnames, public routes, release paths, service accounts, and credentials are d
 - Go 1.25 or newer for a source build, or a binary built from a reviewed repository commit.
 - A static web server that can read the chosen active-release path without write access.
 - One GitHub repository workflow that builds an immutable artifact matching the manifest and checksum contract in `VerifyBundle`.
-- A webhook secret and a GitHub credential scoped only to read Actions runs and artifacts for the configured repository.
+- A human operator who can generate and enter a new webhook secret and a GitHub credential scoped only to read Actions runs and artifacts for the configured repository. Credentials are not repository files and must not be supplied through chat, logs, or source control.
 
 ## Install Repository-Owned Files
 
 1. Build `./cmd/githook` from a reviewed commit after `go test ./...`, `go vet ./...`, and `go build ./cmd/githook` pass.
 2. Install the binary as `~/.local/bin/githook` for the service account.
 3. Copy `packaging/config/runtime.conf.example` to `~/.config/githook/runtime.conf`. Replace repository, workflow name and path, branch, artifact prefix, smoke URLs, and optional deployment paths with host-owned values.
-4. Copy only the receiver secret into `/etc/githook/receiver.conf` and only the GitHub token into `/etc/githook/worker.conf`, using the templates in `packaging/config/`. Restrict both files to root and a dedicated read-only credentials group that contains the service account.
+4. Create `/etc/githook/receiver.conf` and `/etc/githook/worker.conf` from the templates in `packaging/config/`, then have the human operator enter newly generated values through a trusted host credential workflow. The receiver file receives only the webhook secret; the worker file receives only the GitHub token. Restrict both files to root and a dedicated read-only credentials group that contains the service account. Do not ask an AI agent to read, copy, or relay either value.
 5. Copy `packaging/systemd/` into the service account's `~/.config/systemd/user/`. If releases are outside the default user-owned directory, add that exact release root to the worker and reconciliation units' `ReadWritePaths` through host-owned drop-ins.
 6. Reload the user manager, enable and start the receiver and worker, and enable the reconciliation timer. Enable lingering for the service account so the user manager starts at boot without an interactive session.
 
