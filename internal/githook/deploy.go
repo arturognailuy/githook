@@ -78,7 +78,7 @@ func extractTarGz(data []byte, dir string) error {
 		if e != nil {
 			return e
 		}
-		if !safePath(h.Name) {
+		if !safeTarPath(h.Name, h.Typeflag) {
 			return fmt.Errorf("unsafe path %q", h.Name)
 		}
 		dst := filepath.Join(dir, filepath.FromSlash(h.Name))

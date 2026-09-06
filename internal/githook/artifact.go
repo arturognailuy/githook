@@ -80,6 +80,12 @@ func VerifyBundle(z *zip.Reader, repository string, runID int64, sha string) (Bu
 func safePath(name string) bool {
 	return name != "" && !strings.HasPrefix(name, "/") && path.Clean(name) == name && name != ".." && !strings.HasPrefix(name, "../")
 }
+func safeTarPath(name string, typeflag byte) bool {
+	if typeflag == tar.TypeDir {
+		name = strings.TrimSuffix(name, "/")
+	}
+	return safePath(name)
+}
 func InspectTarGz(data []byte) error {
 	gz, e := gzip.NewReader(bytes.NewReader(data))
 	if e != nil {
@@ -98,11 +104,7 @@ func InspectTarGz(data []byte) error {
 		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeDir {
 			return fmt.Errorf("unsafe archive entry %q type %d", h.Name, h.Typeflag)
 		}
-		name := h.Name
-		if h.Typeflag == tar.TypeDir {
-			name = strings.TrimSuffix(name, "/")
-		}
-		if !safePath(name) {
+		if !safeTarPath(h.Name, h.Typeflag) {
 			return fmt.Errorf("unsafe archive path %q", h.Name)
 		}
 	}
