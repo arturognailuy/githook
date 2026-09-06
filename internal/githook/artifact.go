@@ -95,11 +95,15 @@ func InspectTarGz(data []byte) error {
 		if e != nil {
 			return e
 		}
-		if !safePath(h.Name) {
-			return fmt.Errorf("unsafe archive path %q", h.Name)
-		}
 		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeDir {
 			return fmt.Errorf("unsafe archive entry %q type %d", h.Name, h.Typeflag)
+		}
+		name := h.Name
+		if h.Typeflag == tar.TypeDir {
+			name = strings.TrimSuffix(name, "/")
+		}
+		if !safePath(name) {
+			return fmt.Errorf("unsafe archive path %q", h.Name)
 		}
 	}
 	return nil

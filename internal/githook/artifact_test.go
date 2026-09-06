@@ -17,14 +17,24 @@ func tarball(t *testing.T, name string, kind byte) []byte {
 	gz := gzip.NewWriter(&b)
 	tw := tar.NewWriter(gz)
 	data := []byte("ok")
-	if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(data)), Typeflag: kind}); err != nil {
+	size := int64(0)
+	if kind == tar.TypeReg {
+		size = int64(len(data))
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: size, Typeflag: kind}); err != nil {
 		t.Fatal(err)
 	}
 	if kind == tar.TypeReg {
-		tw.Write(data)
+		if _, err := tw.Write(data); err != nil {
+			t.Fatal(err)
+		}
 	}
-	tw.Close()
-	gz.Close()
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
 	return b.Bytes()
 }
 func bundleZip(t *testing.T, archive []byte, m Manifest, checksum string) *zip.Reader {
@@ -72,5 +82,11 @@ func TestVerifyBundleRejectsTamperAndTraversal(t *testing.T) {
 	sum = sha256.Sum256(link)
 	if _, err := VerifyBundle(bundleZip(t, link, m, hex.EncodeToString(sum[:])), m.Repository, 7, sha); err == nil {
 		t.Fatal("accepted link")
+	}
+}
+
+func TestInspectTarGzAcceptsDirectoryWithTrailingSlash(t *testing.T) {
+	if err := InspectTarGz(tarball(t, "about/", tar.TypeDir)); err != nil {
+		t.Fatal(err)
 	}
 }
